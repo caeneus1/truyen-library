@@ -1019,18 +1019,7 @@ Quy tắc:
 - Thêm trường "new_tags": [] vào JSON cho các tag mới chưa có trong danh sách`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    const data = await res.json();
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const text = await callGemini(prompt);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('parse fail');
 
@@ -1066,6 +1055,20 @@ Quy tắc:
 // ══════════════════════════════════════════
 // AI AUTO-FILL FROM LINK
 // ══════════════════════════════════════════
+async function callGemini(prompt) {
+  const GEMINI_KEY = 'AIzaSyAQ-Ab8RN6IWn0wMZFS4STKtsQ-BJQDUTYRAJkvxAqWav_oPGkSfpg';
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3 }
+    })
+  });
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
 async function fetchFromLink() {
   const url = document.getElementById('f-autolink').value.trim();
   if (!url || !url.startsWith('http')) {
@@ -1078,10 +1081,9 @@ async function fetchFromLink() {
   setStatus('loading', '🤖 AI đang đọc trang truyện...');
 
   const allTags = Object.values(TAGS).flat();
+  const prompt = `Bạn là trợ lý tổng hợp truyện đam mỹ/BL tiếng Việt. Dựa vào URL này hãy trích xuất hoặc đoán thông tin truyện: ${url}
 
-  const prompt = `Bạn là trợ lý tổng hợp truyện đam mỹ/BL tiếng Việt. Hãy truy cập trang web này và trích xuất thông tin truyện: ${url}
-
-Trả về JSON với đúng format sau (không thêm gì khác ngoài JSON):
+Trả về JSON thuần (không markdown, không backtick):
 {
   "title": "tên truyện",
   "author": "tên tác giả",
@@ -1089,46 +1091,22 @@ Trả về JSON với đúng format sau (không thêm gì khác ngoài JSON):
   "desc": "mô tả ngắn 2-3 câu tiếng Việt",
   "sweet": 7,
   "tags": [],
+  "new_tags": [],
   "link": "${url}"
 }
 
-Quy tắc chọn tags — ưu tiên từ danh sách này: ${allTags.join(', ')}
-- Nếu truyện có tag quan trọng KHÔNG có trong danh sách trên, thêm vào "new_tags" (tối đa 5 tag mới, ngắn gọn tiếng Việt)
-- Luôn thêm "Đam mỹ" và/hoặc "BL" nếu là truyện boys love
-- Kết thúc: HE (happy ending), BE (bad ending), OE (open ending)
-- Độ ngọt: Ngọt văn, Ngọt sủng, Ngọt đậm, Ngọt nhạt, Ngọt đau, Slow burn ngọt
-- Điểm sweet từ 1-10: 10 = cực ngọt không ngược, 5-6 = có ngược, 1-3 = BE/ngược nhiều
-- Tình trạng: Hoàn / Đang ra / Drop
-- Nguồn: Chinese / Korean / Japanese / Vietnamese / Thai
-- Thêm trường "new_tags": [] vào JSON cho các tag mới chưa có trong danh sách
-
-Nếu không truy cập được trang web, hãy dựa vào URL và tên truyện để đoán thông tin tốt nhất có thể.`;
+Quy tắc:
+- Ưu tiên tags từ danh sách: ${allTags.join(', ')}
+- new_tags: tối đa 5 tag mới quan trọng chưa có trong danh sách trên
+- HE/BE/OE = kết thúc, sweet 1-10 (10=cực ngọt), Hoàn/Đang ra/Drop = tình trạng
+- Nguồn: Chinese/Korean/Japanese/Vietnamese/Thai`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    const data = await res.json();
-    const text = (data.content || [])
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('');
-
-    // Parse JSON từ response
+    const text = await callGemini(prompt);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Không parse được JSON');
-
+    if (!jsonMatch) throw new Error('parse fail');
     const info = JSON.parse(jsonMatch[0]);
 
-    // Điền vào form
     document.getElementById('f-title').value    = info.title    || '';
     document.getElementById('f-author').value   = info.author   || '';
     document.getElementById('f-chapters').value = info.chapters || '';
@@ -1137,11 +1115,8 @@ Nếu không truy cập được trang web, hãy dựa vào URL và tên truyệ
     document.getElementById('f-sweet').value    = info.sweet    || 7;
     document.getElementById('sweet-display').textContent = info.sweet || 7;
 
-    // Thêm tag mới vào hệ thống nếu có
     const newTags = info.new_tags || [];
     newTags.forEach(t => addNewTag(t));
-
-    // Tick tất cả tags (cũ + mới)
     document.querySelectorAll('.ftag-check input').forEach(cb => {
       cb.checked = (info.tags || []).includes(cb.value) || newTags.includes(cb.value);
       cb.parentElement.classList.toggle('on', cb.checked);
@@ -1150,7 +1125,7 @@ Nếu không truy cập được trang web, hãy dựa vào URL và tên truyệ
     const newTagMsg = newTags.length ? ` Thêm ${newTags.length} tag mới: ${newTags.join(', ')}` : '';
     setStatus('success', `✅ Đã điền xong! Kiểm tra lại rồi bấm "Thêm vào thư viện" nhé~${newTagMsg}`);
   } catch(e) {
-    setStatus('error', '❌ Không đọc được trang này. Bạn thử nhập tay nha!');
+    setStatus('error', '❌ Không đọc được trang này. Bồ thử tab "Dán nội dung trang" nhé!');
   } finally {
     btn.disabled = false;
   }
