@@ -1019,7 +1019,17 @@ Quy tắc:
 - Thêm trường "new_tags": [] vào JSON cho các tag mới chưa có trong danh sách`;
 
   try {
-    const text = await callGemini(prompt);
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const apiData = await apiRes.json();
+    const text = (apiData.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('parse fail');
 
