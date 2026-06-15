@@ -484,6 +484,36 @@ header::after {
 .ftag.new-tag { border-style: dashed; }
 .ftag-check.new-tag { border-style: dashed; }
 
+/* ── CUSTOM TAG INPUT ── */
+.custom-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.custom-tag-row .fi {
+  flex: 1;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  border-radius: 50px;
+}
+.add-tag-btn {
+  background: transparent;
+  border: 1.5px solid var(--purple);
+  color: var(--purple-light);
+  padding: 0.28rem 0.8rem;
+  border-radius: 50px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.add-tag-btn:hover { background: var(--purple); color: white; }
+
 .submit-btn {
   background: linear-gradient(135deg, var(--purple), var(--pink));
   color: white;
@@ -666,11 +696,9 @@ header::after {
     </div>
     <textarea class="fi fi-full" id="f-desc" rows="2" placeholder="Mô tả ngắn..."></textarea>
 
-    <div class="sweet-input-row">
-      <label>🍯 Độ ngọt:</label>
-      <input type="range" id="f-sweet" min="1" max="10" value="7" oninput="document.getElementById('sweet-display').textContent=this.value">
-      <span class="sweet-val" id="sweet-display">7</span>
-      <span style="font-size:0.75rem;color:var(--text-faint)">/10</span>
+    <div class="custom-tag-row">
+      <input class="fi" id="custom-tag-input" placeholder="✨ Thêm tag mới..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomTag()}">
+      <button class="add-tag-btn" onclick="addCustomTag()">+ Thêm tag</button>
     </div>
 
     <div class="form-tag-section">
@@ -915,8 +943,6 @@ async function addNovel() {
 
     ['f-title','f-author','f-chapters','f-link'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-desc').value = '';
-    document.getElementById('f-sweet').value = 7;
-    document.getElementById('sweet-display').textContent = '7';
     document.querySelectorAll('.ftag-check input').forEach(c => { c.checked = false; c.parentElement.classList.remove('on'); });
 
     await loadNovels();
@@ -1040,8 +1066,6 @@ Quy tắc:
     document.getElementById('f-chapters').value = info.chapters || '';
     document.getElementById('f-desc').value     = info.desc     || '';
     document.getElementById('f-link').value     = info.link     || '';
-    document.getElementById('f-sweet').value    = info.sweet    || 7;
-    document.getElementById('sweet-display').textContent = info.sweet || 7;
 
     // Thêm tag mới vào hệ thống nếu có
     const newTags = info.new_tags || [];
@@ -1156,8 +1180,6 @@ Quy tắc:
     document.getElementById('f-chapters').value = info.chapters || '';
     document.getElementById('f-desc').value     = info.desc     || '';
     document.getElementById('f-link').value     = info.link     || url;
-    document.getElementById('f-sweet').value    = info.sweet    || 7;
-    document.getElementById('sweet-display').textContent = info.sweet || 7;
 
     const newTags = info.new_tags || [];
     newTags.forEach(t => addNewTag(t));
@@ -1202,6 +1224,27 @@ function addNewTag(tag) {
   lbl.innerHTML = `<input type="checkbox" value="${tag}"> ✨ ${tag}`;
   lbl.querySelector('input').onchange = function(){ lbl.classList.toggle('on', this.checked); };
   formWrap.appendChild(lbl);
+}
+
+// ══════════════════════════════════════════
+// CUSTOM TAG TỰ THÊM
+// ══════════════════════════════════════════
+function addCustomTag() {
+  const input = document.getElementById('custom-tag-input');
+  const tag = input.value.trim();
+  if (!tag) return;
+  addNewTag(tag);
+
+  // Auto-check tag vừa thêm
+  document.querySelectorAll('.ftag-check input').forEach(cb => {
+    if (cb.value === tag) {
+      cb.checked = true;
+      cb.parentElement.classList.add('on');
+    }
+  });
+
+  input.value = '';
+  input.focus();
 }
 
 function setStatus(type, msg) {
